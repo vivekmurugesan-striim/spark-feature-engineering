@@ -15,7 +15,7 @@ public class FeatureGenerationUtils {
     //FraudTransactionHeader: ID,IS_FRAUD,TRANS_ID
 
     public static Dataset<Row> generateTransactionFeatures(Dataset<Row> tx, Dataset<Row> cust, Dataset<Row> merch, Dataset<Row> fraud) {
-        // Headers: Transaction(ID, TRANS_TIMESTAMP, VALIUEUSD, CUSTOMER_ID, MERCHANT_ID)
+        // Headers: Transaction(ID, TRANS_TIMESTAMP, VALUEUSD, CUSTOMER_ID, MERCHANT_ID)
         // Headers: Customers(ID, CITY), Merchants(ID, CATEGORY, CITY), Fraud(TRANS_ID, IS_FRAUD)
         return tx.join(cust, tx.col("CUSTOMER_ID").equalTo(cust.col("ID")), "left")
                 .join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")), "left")
@@ -32,13 +32,13 @@ public class FeatureGenerationUtils {
     }
 
     public static Dataset<Row> generateCustomerFeatures(Dataset<Row> tx, Dataset<Row> cust, Dataset<Row> fraud, Dataset<Row> dev) {
-        // Headers: Transaction(CUSTOMER_ID, VALIUEUSD), CustomerDevices(CUST_ID)
+        // Headers: Transaction(CUSTOMER_ID, VALUEUSD), CustomerDevices(CUST_ID)
         Dataset<Row> txAggs = tx.groupBy("CUSTOMER_ID").agg(
                 count("ID").as("CustomerTransactionCount"),
-                sum("VALIUEUSD").as("CustomerTotalAmount"),
-                avg("VALIUEUSD").as("CustomerAvgAmount"),
-                max("VALIUEUSD").as("HighestTransactionValue"),
-                min("VALIUEUSD").as("LowestTransactionValue")
+                sum("VALUEUSD").as("CustomerTotalAmount"),
+                avg("VALUEUSD").as("CustomerAvgAmount"),
+                max("VALUEUSD").as("HighestTransactionValue"),
+                min("VALUEUSD").as("LowestTransactionValue")
         );
 
         Dataset<Row> fraudAgg = tx.join(fraud, tx.col("ID").equalTo(fraud.col("TRANS_ID")))
@@ -61,8 +61,8 @@ public class FeatureGenerationUtils {
         Dataset<Row> txFraud = tx.join(fraud, tx.col("ID").equalTo(fraud.col("TRANS_ID")), "left");
         return txFraud.groupBy("MERCHANT_ID").agg(
                 count("ID").as("MerchantTransactionCount"),
-                sum("VALIUEUSD").as("MerchantTotalAmount"),
-                avg("VALIUEUSD").as("MerchantAvgAmount"),
+                sum("VALUEUSD").as("MerchantTotalAmount"),
+                avg("VALUEUSD").as("MerchantAvgAmount"),
                 sum(when(col("IS_FRAUD").equalTo("TRUE"), 1).otherwise(0)).as("MerchantFraudCount")
         ).withColumn("MF_ID", col("MERCHANT_ID")).drop("MERCHANT_ID");
     }
@@ -72,7 +72,7 @@ public class FeatureGenerationUtils {
                 .join(fraud, tx.col("ID").equalTo(fraud.col("TRANS_ID")), "left");
         return txFull.groupBy("CATEGORY").agg(
                 count("ID").as("CategoryTransactionCount"),
-                sum("VALIUEUSD").as("CategoryTotalAmount"),
+                sum("VALUEUSD").as("CategoryTotalAmount"),
                 sum(when(col("IS_FRAUD").equalTo("TRUE"), 1).otherwise(0)).as("CategoryFraudCount")
         ).withColumn("MCF_CATEGORY", col("CATEGORY")).drop("CATEGORY");
     }
@@ -80,7 +80,7 @@ public class FeatureGenerationUtils {
     public static Dataset<Row> generateCustomerMerchantFeatures(Dataset<Row> tx) {
         return tx.groupBy("CUSTOMER_ID", "MERCHANT_ID").agg(
                         count("ID").as("CustMerchTransactionCount"),
-                        sum("VALIUEUSD").as("CustMerchTotalAmount")
+                        sum("VALUEUSD").as("CustMerchTotalAmount")
                 ).withColumn("CM_CUSTOMER_ID", col("CUSTOMER_ID")).withColumn("CM_MERCHANT_ID", col("MERCHANT_ID"))
                 .drop("CUSTOMER_ID", "MERCHANT_ID");
     }
@@ -89,7 +89,7 @@ public class FeatureGenerationUtils {
         Dataset<Row> txMerch = tx.join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")));
         return txMerch.groupBy("CUSTOMER_ID", "CATEGORY").agg(
                         count("ID").as("CustMerchCatTransactionCount"),
-                        sum("VALIUEUSD").as("CustMerchCatTotalAmount")
+                        sum("VALUEUSD").as("CustMerchCatTotalAmount")
                 ).withColumn("CMC_CUSTOMER_ID", col("CUSTOMER_ID")).withColumn("CMC_CATEGORY", col("CATEGORY"))
                 .drop("CUSTOMER_ID", "CATEGORY");
     }
