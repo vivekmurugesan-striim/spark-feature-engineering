@@ -29,6 +29,14 @@
             <version>3.5.8</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- Source: https://mvnrepository.com/artifact/org.apache.spark/spark-mllib -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-mllib_2.13</artifactId>
+            <version>3.5.8</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>
