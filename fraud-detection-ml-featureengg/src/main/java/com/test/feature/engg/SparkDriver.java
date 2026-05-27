@@ -28,7 +28,9 @@ public class SparkDriver {
         //MerchanHeader: ID,CATEGORY,CITY,NAME
         Dataset<Row> merchants = spark.read().option("header", "true").csv(inputDir + "/merchant*.csv");
         //TransactionHeader: ID,STATUS,TRANS_TIMESTAMP,VALUEUSD,CUSTOMER_ID,DEVICE_ID,MERCHANT_ID
-        Dataset<Row> transactions = spark.read().option("header", "true").csv(inputDir + "/transaction*.csv");
+        Dataset<Row> transactions = spark.read().option("header", "true")
+                .option("spark.sql.legacy.timeParserPolicy", "LEGACY")
+                .csv(inputDir + "/transaction*.csv");
         //FraudTransactionHeader: ID,IS_FRAUD,TRANS_ID
         Dataset<Row> fraudTransactions = spark.read().option("header", "true").csv(inputDir + "/fraud_transaction*.csv");
 
