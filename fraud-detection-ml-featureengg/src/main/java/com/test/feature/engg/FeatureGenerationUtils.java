@@ -18,7 +18,10 @@ public class FeatureGenerationUtils {
 
     // Helper: Enrich Transactions with time components and fraud status
     private static Dataset<Row> enrichTx(Dataset<Row> tx, Dataset<Row> fraud) {
-        return tx.join(fraud, tx.col("ID").equalTo(fraud.col("TRANS_ID")), "left")
+        // Rename fraud.ID to avoid ambiguity with tx.ID
+        Dataset<Row> renamedFraud = fraud.withColumnRenamed("ID", "FRAUD_PK_ID");
+
+        return tx.join(renamedFraud, tx.col("ID").equalTo(renamedFraud.col("TRANS_ID")), "left")
                 .withColumn("ts", to_timestamp(col("TRANS_TIMESTAMP")))
                 .withColumn("amount", col("VALUEUSD"))
                 .withColumn("date", to_date(col("ts")))
@@ -47,9 +50,9 @@ public class FeatureGenerationUtils {
     public static Dataset<Row> generateMerchantFeatures(Dataset<Row> tx, Dataset<Row> merch, Dataset<Row> fraud) {
         Dataset<Row> t = enrichTx(tx, fraud);
 
-        // Aggregates
+        // Aggregates - Using tx.col("ID") to be explicit
         Dataset<Row> base = t.groupBy("MERCHANT_ID").agg(
-                count("ID").as("MerchantTransactionCount"),
+                count(tx.col("ID")).as("MerchantTransactionCount"),
                 sum("amount").as("MerchantTotalAmount"),
                 avg("amount").as("MerchantAvgAmount"),
                 sum("is_fraud_num").as("MerchantFraudCount"),
@@ -57,15 +60,13 @@ public class FeatureGenerationUtils {
                 min("amount").as("LowestTransactionValueForMerchant")
         ).withColumn("MerchantFraudRate", col("MerchantFraudCount").divide(col("MerchantTransactionCount")));
 
-        // Time Averages
         Dataset<Row> daily = t.groupBy("MERCHANT_ID", "date").agg(sum("amount").as("s")).groupBy("MERCHANT_ID").agg(avg("s").as("DailyTransValueAvgForMerchant"));
         Dataset<Row> weekly = t.groupBy("MERCHANT_ID", "year", "week").agg(sum("amount").as("s")).groupBy("MERCHANT_ID").agg(avg("s").as("WeeklyTransValueAvgForMerchant"));
         Dataset<Row> monthly = t.groupBy("MERCHANT_ID", "year", "month").agg(sum("amount").as("s")).groupBy("MERCHANT_ID").agg(avg("s").as("MonthlyTransValueAvgForMerchant"));
 
-        // Frequency (Modes)
         Dataset<Row> modes = getMode(t, "MERCHANT_ID", "day", "Merchant").join(getMode(t, "MERCHANT_ID", "hour", "Merchant"), "MERCHANT_ID");
 
-        return merch.withColumn("M_ID", col("ID"))
+        return merch.withColumn("M_ID", merch.col("ID"))
                 .join(base, merch.col("ID").equalTo(base.col("MERCHANT_ID")), "left")
                 .join(daily, "MERCHANT_ID", "left").join(weekly, "MERCHANT_ID", "left").join(monthly, "MERCHANT_ID", "left")
                 .join(modes, "MERCHANT_ID", "left").drop("MERCHANT_ID");
@@ -75,7 +76,7 @@ public class FeatureGenerationUtils {
         Dataset<Row> t = enrichTx(tx, fraud).join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")));
 
         Dataset<Row> base = t.groupBy("CUSTOMER_ID").agg(
-                count("tx.ID").as("CustomerTransactionCount"),
+                count(tx.col("ID")).as("CustomerTransactionCount"),
                 sum("amount").as("CustomerTotalAmount"),
                 avg("amount").as("CustomerAvgAmount"),
                 sum("is_fraud_num").as("CustomerFraudCount"),
@@ -83,14 +84,13 @@ public class FeatureGenerationUtils {
                 min("amount").as("LowestTransactionValue")
         ).withColumn("CustomerFraudRate", col("CustomerFraudCount").divide(col("CustomerTransactionCount")));
 
-        Dataset<Row> devAgg = dev.groupBy("CUST_ID").agg(countDistinct("ID").as("CustomerDeviceCount"));
+        Dataset<Row> devAgg = dev.groupBy("CUST_ID").agg(countDistinct(dev.col("ID")).as("CustomerDeviceCount"));
 
-        // Mode Category
         Dataset<Row> catMode = t.groupBy("CUSTOMER_ID", "CATEGORY").agg(count("*").as("c"))
                 .withColumn("rn", row_number().over(Window.partitionBy("CUSTOMER_ID").orderBy(desc("c"))))
                 .filter(col("rn").equalTo(1)).select(col("CUSTOMER_ID").as("c_tmp"), col("CATEGORY").as("TopSpentCategory"));
 
-        return cust.withColumn("C_ID", col("ID"))
+        return cust.withColumn("C_ID", cust.col("ID"))
                 .join(base, cust.col("ID").equalTo(base.col("CUSTOMER_ID")), "left")
                 .join(devAgg, cust.col("ID").equalTo(devAgg.col("CUST_ID")), "left")
                 .join(catMode, cust.col("ID").equalTo(catMode.col("c_tmp")), "left").drop("CUSTOMER_ID", "CUST_ID", "c_tmp");
@@ -100,7 +100,7 @@ public class FeatureGenerationUtils {
         Dataset<Row> t = enrichTx(tx, fraud).join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")));
 
         return t.groupBy("CATEGORY").agg(
-                        count("tx.ID").as("CategoryTransactionCount"),
+                        count(tx.col("ID")).as("CategoryTransactionCount"),
                         sum("amount").as("CategoryTotalAmount"),
                         avg("amount").as("CategoryAvgAmount"),
                         sum("is_fraud_num").as("CategoryFraudCount"),
@@ -113,13 +113,12 @@ public class FeatureGenerationUtils {
     public static Dataset<Row> generateCustomerMerchantFeatures(Dataset<Row> tx, Dataset<Row> fraud) {
         Dataset<Row> t = enrichTx(tx, fraud).withColumn("unix_ts", unix_timestamp(col("ts")));
 
-        // Time Since Last Tx
         WindowSpec window = Window.partitionBy("CUSTOMER_ID", "MERCHANT_ID").orderBy("ts");
         Dataset<Row> timeDelta = t.withColumn("prev_ts", lag("unix_ts", 1).over(window))
                 .groupBy("CUSTOMER_ID", "MERCHANT_ID").agg(avg(col("unix_ts").minus(col("prev_ts"))).as("TimeSinceLastTx"));
 
         Dataset<Row> aggs = t.groupBy("CUSTOMER_ID", "MERCHANT_ID").agg(
-                count("ID").as("CustMerchTransactionCount"),
+                count(tx.col("ID")).as("CustMerchTransactionCount"),
                 sum("amount").as("CustMerchTotalAmount"),
                 avg("amount").as("CustMerchAvgAmount"),
                 sum("is_fraud_num").as("CustMerchFraudCount"),
@@ -134,7 +133,7 @@ public class FeatureGenerationUtils {
         Dataset<Row> t = enrichTx(tx, fraud).join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")));
 
         return t.groupBy("CUSTOMER_ID", "CATEGORY").agg(
-                        count("tx.ID").as("CustMerchCatTransactionCount"),
+                        count(tx.col("ID")).as("CustMerchCatTransactionCount"),
                         sum("amount").as("CustMerchCatTotalAmount"),
                         avg("amount").as("CustMerchCatAvgAmount"),
                         sum("is_fraud_num").as("CustMerchCatFraudCount")
