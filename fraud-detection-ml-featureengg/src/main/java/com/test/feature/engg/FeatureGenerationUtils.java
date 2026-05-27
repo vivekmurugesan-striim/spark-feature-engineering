@@ -34,17 +34,23 @@ public class FeatureGenerationUtils {
                 .withColumn("is_fraud_num", when(col("IS_FRAUD").equalTo("TRUE"), 1).otherwise(0));
     }
 
-    // Helper: Compute Mode (Top/Least Freq) for categorical dimensions
+    /**
+     * Corrected Helper: Compute Mode (Top/Least Freq) for categorical dimensions.
+     * Now preserves the idCol to allow for subsequent joins.
+     */
     private static Dataset<Row> getMode(Dataset<Row> t, String idCol, String dimCol, String prefix) {
         Dataset<Row> counts = t.groupBy(idCol, dimCol).agg(count("*").as("c"));
 
         Dataset<Row> top = counts.withColumn("rn", row_number().over(Window.partitionBy(idCol).orderBy(desc("c"))))
-                .filter(col("rn").equalTo(1)).select(col(idCol).as("tmp_id"), col(dimCol).as("TopFreq" + prefix + dimCol));
+                .filter(col("rn").equalTo(1))
+                .select(col(idCol), col(dimCol).as("TopFreq" + prefix + dimCol));
 
         Dataset<Row> least = counts.withColumn("rn", row_number().over(Window.partitionBy(idCol).orderBy(asc("c"))))
-                .filter(col("rn").equalTo(1)).select(col(idCol).as("tmp_id2"), col(dimCol).as("LeastFreq" + prefix + dimCol));
+                .filter(col("rn").equalTo(1))
+                .select(col(idCol), col(dimCol).as("LeastFreq" + prefix + dimCol));
 
-        return top.join(least, top.col("tmp_id").equalTo(least.col("tmp_id2")), "inner").drop("tmp_id", "tmp_id2");
+        // Use a simple join on the idCol string to avoid duplicate columns and keep the ID
+        return top.join(least, idCol);
     }
 
     public static Dataset<Row> generateMerchantFeatures(Dataset<Row> tx, Dataset<Row> merch, Dataset<Row> fraud) {
