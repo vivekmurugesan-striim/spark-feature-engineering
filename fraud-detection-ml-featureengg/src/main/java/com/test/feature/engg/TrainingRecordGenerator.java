@@ -50,7 +50,8 @@ public class TrainingRecordGenerator {
                 // Join Merchant Features using M_ID
                 .join(merchFeats.as("merch"), col("tx.MERCHANT_ID").equalTo(col("merch.M_ID")), "left")
                 .drop(col("merch.M_ID")).drop(col("merch.ID")).drop(col(
-                        "merch.CATEGORY"))
+                        "merch.CATEGORY")).drop(col(
+                        "merch.CITY"))
 
                 // Join Merchant Category Features
                 .join(merchCatFeats.as("mcf"), col("tx.CATEGORY").equalTo(col("mcf.MCF_CATEGORY")), "left")
