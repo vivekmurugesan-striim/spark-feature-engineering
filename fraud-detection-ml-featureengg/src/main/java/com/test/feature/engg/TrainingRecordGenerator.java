@@ -45,10 +45,10 @@ public class TrainingRecordGenerator {
         // We use left joins to ensure every transaction is preserved
         Dataset<Row> combined = txFeats
                 // Join with Customer Features
-                .join(custFeats, txFeats.col("CUSTOMER_ID").equalTo(custFeats.col("CF_ID")), "left")
+                .join(custFeats, txFeats.col("CUSTOMER_ID").equalTo(custFeats.col("C_ID")), "left")
 
                 // Join with Merchant Features
-                .join(merchFeats, txFeats.col("MERCHANT_ID").equalTo(merchFeats.col("MF_ID")), "left")
+                .join(merchFeats, txFeats.col("MERCHANT_ID").equalTo(merchFeats.col("M_ID")), "left")
 
                 // Join with Category Features
                 .join(merchCatFeats, txFeats.col("CATEGORY").equalTo(merchCatFeats.col("MCF_CATEGORY")), "left")
