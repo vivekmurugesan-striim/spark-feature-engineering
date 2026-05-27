@@ -43,35 +43,46 @@ public class TrainingRecordGenerator {
 
         // 2. Combine Datasets using TransactionFeatures as the Base
         // We use left joins to ensure every transaction is preserved
-        Dataset<Row> combined = txFeats
-                // Join with Customer Features
-                .join(custFeats, txFeats.col("CUSTOMER_ID").equalTo(custFeats.col("C_ID")), "left")
+        Dataset<Row> combined = txFeats.as("tx")
+                // Join Customer Features
+                .join(custFeats.as("cust"), col("tx.CUSTOMER_ID").equalTo(col("cust.C_ID")), "left")
+                .drop(col("cust.C_ID"))
 
-                // Join with Merchant Features
-                .join(merchFeats, txFeats.col("MERCHANT_ID").equalTo(merchFeats.col("M_ID")), "left")
+                // Join Merchant Features (CATEGORY conflict now resolved by the drop above)
+                .join(merchFeats.as("merch"), col("tx.MERCHANT_ID").equalTo(col("merch.M_ID")), "left")
+                .drop(col("merch.M_ID")).drop("merch.CATEGORY")
 
-                // Join with Category Features
-                .join(merchCatFeats, txFeats.col("CATEGORY").equalTo(merchCatFeats.col("MCF_CATEGORY")), "left")
+                // Join Merchant Category Features
+                .join(merchCatFeats.as("mcf"), col("tx.CATEGORY").equalTo(col("mcf.MCF_CATEGORY")), "left")
+                .drop(col("mcf.MCF_CATEGORY"))
 
-                // Join with Customer-Merchant Interaction Features
-                .join(custMerchFeats,
-                        txFeats.col("CUSTOMER_ID").equalTo(custMerchFeats.col("CM_CUSTOMER_ID"))
-                                .and(txFeats.col("MERCHANT_ID").equalTo(custMerchFeats.col("CM_MERCHANT_ID"))), "left")
+                // Join Customer-Merchant Interaction
+                .join(custMerchFeats.as("cm"),
+                        col("tx.CUSTOMER_ID").equalTo(col("cm.CM_CUSTOMER_ID"))
+                                .and(col("tx.MERCHANT_ID").equalTo(col("cm.CM_MERCHANT_ID"))), "left")
+                .drop(col("cm.CM_CUSTOMER_ID")).drop(col("cm.CM_MERCHANT_ID"))
 
-                // Join with Customer-Category Interaction Features
-                .join(custMerchCatFeats,
-                        txFeats.col("CUSTOMER_ID").equalTo(custMerchCatFeats.col("CMC_CUSTOMER_ID"))
-                                .and(txFeats.col("CATEGORY").equalTo(custMerchCatFeats.col("CMC_CATEGORY"))), "left")
+                // Join Customer-Category Interaction
+                .join(custMerchCatFeats.as("cmc"),
+                        col("tx.CUSTOMER_ID").equalTo(col("cmc.CMC_CUSTOMER_ID"))
+                                .and(col("tx.CATEGORY").equalTo(col("cmc.CMC_CATEGORY"))), "left")
+                .drop(col("cmc.CMC_CUSTOMER_ID")).drop(col("cmc.CMC_CATEGORY"))
 
-                // Join with Fraud Labels (using transaction ID)
-                .join(fraudTrans, txFeats.col("ID").equalTo(fraudTrans.col("TRANS_ID")), "left");
+                // Join Fraud Labels
+                .join(fraudTrans.as("f"), col("tx.ID").equalTo(col("f.TRANS_ID")), "left")
+                .drop(col("f.TRANS_ID"));
 
         // 3. Clean up join-key columns to avoid duplicates in the final CSV
-        Dataset<Row> trainingRecords = combined.drop(
+        /*Dataset<Row> trainingRecords = combined.drop(
                 "CF_ID", "MF_ID", "MCF_CATEGORY",
                 "CM_CUSTOMER_ID", "CM_MERCHANT_ID",
                 "CMC_CUSTOMER_ID", "CMC_CATEGORY", "TRANS_ID"
-        );
+        );*/
+
+        Dataset<Row> trainingRecords = combined.drop("cust.ID", "f.ID");
+
+        System.out.println("TrainRecord structure::");
+        System.out.println(trainingRecords.describe().toString());
 
         // 4. Persist Result
         // Note: coalesce(1) is removed for memory safety. Spark will write multiple files.
