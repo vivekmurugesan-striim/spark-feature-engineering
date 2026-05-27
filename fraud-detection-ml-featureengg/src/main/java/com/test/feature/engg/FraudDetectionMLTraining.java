@@ -18,6 +18,15 @@ import java.util.List;
 
 public class FraudDetectionMLTraining {
     public static void main(String[] args) {
+
+        if (args.length < 2) {
+            System.err.println("Usage: SparkDriver <input-dir> <output-dir>");
+            System.exit(1);
+        }
+
+        String inputDir = args[0];
+        String outputDir = args[1];
+
         SparkSession spark = SparkSession.builder()
                 .appName("Large Scale Fraud Prediction Training")
                 .config("spark.sql.broadcastTimeout", "1200") // Handling large data joins/broadcasts
@@ -28,7 +37,7 @@ public class FraudDetectionMLTraining {
         Dataset<Row> rawData = spark.read()
                 .option("header", "true")
                 .option("inferSchema", "true")
-                .csv("TrainingData/*.csv");
+                .csv(inputDir + "/*.csv");
 
         // 2. EDA: Show Summary Statistics
         System.out.println("Summary Statistics for numerical features:");
@@ -134,7 +143,8 @@ public class FraudDetectionMLTraining {
 
         // 11. Export Model
         try {
-            model.write().overwrite().save("Models/FraudRandomForestModel");
+            model.write().overwrite().save(outputDir +
+                    "/FraudRandomForestModel");
         }catch(IOException e){
             System.out.println("Not able to persist the model");
             e.printStackTrace();
