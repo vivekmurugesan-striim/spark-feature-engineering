@@ -20,7 +20,7 @@ public class FeatureGenerationUtils {
     private static Dataset<Row> enrichTx(Dataset<Row> tx, Dataset<Row> fraud) {
         return tx.join(fraud, tx.col("ID").equalTo(fraud.col("TRANS_ID")), "left")
                 .withColumn("ts", to_timestamp(col("TRANS_TIMESTAMP")))
-                .withColumn("amount", col("VALIUEUSD"))
+                .withColumn("amount", col("VALUEUSD"))
                 .withColumn("date", to_date(col("ts")))
                 .withColumn("hour", hour(col("ts")))
                 .withColumn("day", dayofmonth(col("ts")))
