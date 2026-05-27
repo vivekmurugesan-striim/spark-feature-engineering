@@ -12,6 +12,7 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import static org.apache.spark.sql.functions.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -132,8 +133,12 @@ public class FraudDetectionMLTraining {
         System.out.println("Model Accuracy on Test Set: " + accuracy);
 
         // 11. Export Model
-        model.write().overwrite().save("Models/FraudRandomForestModel");
-
+        try {
+            model.write().overwrite().save("Models/FraudRandomForestModel");
+        }catch(IOException e){
+            System.out.println("Not able to persist the model");
+            e.printStackTrace();
+        }
         /*
            Note on ONNX: Spark Java does not support native ONNX export.
            To export to ONNX for production inference, use the 'onnxmltools' Python library
