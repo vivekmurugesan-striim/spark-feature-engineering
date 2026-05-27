@@ -16,6 +16,7 @@ public class SparkDriver {
 
         SparkSession spark = SparkSession.builder()
                 .appName("Banking Feature Engineering")
+                .config("spark.sql.legacy.timeParserPolicy", "LEGACY")
                 .getOrCreate();
 
         // 1. Read Raw Datasets
