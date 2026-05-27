@@ -42,7 +42,7 @@ public class SparkDriver {
         String[] names = {"TransactionFeatures", "MerchantFeatures", "CustomerFeatures", "MerchantCategoryFeatures", "CustomerMerchantFeatures", "CustomerMerchantCategoryFeatures"};
 
         for (int i = 0; i < names.length; i++) {
-            sets.get(i).coalesce(1).write().mode("overwrite").option("header", "true").csv(outputDir + "/" + names[i]);
+            sets.get(i).write().mode("overwrite").option("header", "true").csv(outputDir + "/" + names[i]);
         }
 
 
@@ -59,7 +59,7 @@ public class SparkDriver {
                                 .and(transFeats.col("CATEGORY").equalTo(custMerchCatFeats.col("CMC_CATEGORY"))), "left")
                 .drop("C_ID", "M_ID", "MCF_CATEGORY", "CM_CUSTOMER_ID", "CM_MERCHANT_ID", "CMC_CUSTOMER_ID", "CMC_CATEGORY");
 
-        trainingRecords.coalesce(1).write().mode("overwrite").option("header", "true").csv(outputDir + "/TrainingRecords");
+        trainingRecords.write().mode("overwrite").option("header", "true").csv(outputDir + "/TrainingRecords");
 
         spark.stop();
     }
