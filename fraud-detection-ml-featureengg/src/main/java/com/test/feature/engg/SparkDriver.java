@@ -4,6 +4,9 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class SparkDriver {
     public static void main(String[] args) {
         if (args.length < 2) {
@@ -19,65 +22,44 @@ public class SparkDriver {
                 .config("spark.sql.legacy.timeParserPolicy", "LEGACY")
                 .getOrCreate();
 
-        // 1. Read Raw Datasets
-        //CustomerHeader: ID,ACCOUNT_AGE_DAYS,AGE,CITY,CREDIT_SCORE,FIRST_NAME,
-        // LAST_NAME
-        System.out.println("Reading files and creating Spark datasets..");
-        Dataset<Row> customers = spark.read().option("header", "true").csv(inputDir + "/customer*.csv");
-        //CustemerDeviceHeader: ID,DEVICE_TYPE,OS,STATUS,CUST_ID
-        Dataset<Row> customerDevices = spark.read().option("header", "true").csv(inputDir + "/customer_device*.csv");
-        //MerchanHeader: ID,CATEGORY,CITY,NAME
-        Dataset<Row> merchants = spark.read().option("header", "true").csv(inputDir + "/merchant*.csv");
-        //TransactionHeader: ID,STATUS,TRANS_TIMESTAMP,VALUEUSD,CUSTOMER_ID,DEVICE_ID,MERCHANT_ID
-        Dataset<Row> transactions = spark.read().option("header", "true")
-                .option("spark.sql.legacy.timeParserPolicy", "LEGACY")
-                .csv(inputDir + "/transaction*.csv");
-        //FraudTransactionHeader: ID,IS_FRAUD,TRANS_ID
-        Dataset<Row> fraudTransactions = spark.read().option("header", "true").csv(inputDir + "/fraud_transaction*.csv");
+        // 1. Load Datasets
+        Dataset<Row> customers = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer*.csv");
+        Dataset<Row> devices = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer_device*.csv");
+        Dataset<Row> merchants = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/merchant*.csv");
+        Dataset<Row> transactions = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/transaction*.csv");
+        Dataset<Row> fraud = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/fraud_transaction*.csv");
 
-        System.out.println("Generating feature groups.. for transaction and " +
-                "customers..");
         // 2. Generate Feature Groups
-        Dataset<Row> transFeats = FeatureGenerationUtils.generateTransactionFeatures(transactions,
-                customers, merchants, fraudTransactions);
-        Dataset<Row> custFeats =
-                FeatureGenerationUtils.generateCustomerFeatures(transactions, customers,  fraudTransactions, customerDevices);
-        /*Dataset<Row> merchFeats =
-                FeatureGenerationUtils.generateMerchantFeatures(transactions, merchants, fraudTransactions);
-        Dataset<Row> merchCatFeats = FeatureGenerationUtils.generateMerchantCategoryFeatures(transactions, merchants, fraudTransactions);
-        Dataset<Row> custMerchFeats = FeatureGenerationUtils.generateCustomerMerchantFeatures(transactions);
-        Dataset<Row> custMerchCatFeats = FeatureGenerationUtils
-        .generateCustomerMerchantCategoryFeatures(transactions, merchants);
-         */
+        Dataset<Row> transFeats = FeatureGenerationUtils.generateTransactionFeatures(transactions, customers, merchants, fraud);
+        Dataset<Row> merchFeats = FeatureGenerationUtils.generateMerchantFeatures(transactions, merchants, fraud);
+        Dataset<Row> custFeats = FeatureGenerationUtils.generateCustomerFeatures(transactions, customers, fraud, devices, merchants);
+        Dataset<Row> merchCatFeats = FeatureGenerationUtils.generateMerchantCategoryFeatures(transactions, merchants, fraud);
+        Dataset<Row> custMerchFeats = FeatureGenerationUtils.generateCustomerMerchantFeatures(transactions, fraud);
+        Dataset<Row> custMerchCatFeats = FeatureGenerationUtils.generateCustomerMerchantCategoryFeatures(transactions, merchants, fraud);
 
-        System.out.println("Persisting transaction and customer feature " +
-                "groups to files.. ");
-        // 3. Persist Individual Groups
-        transFeats.write().mode("overwrite").option("header", "true").csv(outputDir + "/TransactionFeatures");
-        custFeats.write().mode("overwrite").option("header", "true").csv(outputDir + "/CustomerFeatures");
-        /*
-        merchFeats.write().mode("overwrite").option("header", "true").csv(outputDir + "/MerchantFeatures");
-        merchCatFeats.write().mode("overwrite").option("header", "true").csv(outputDir + "/MerchantCategoryFeatures");
-        custMerchFeats.write().mode("overwrite").option("header", "true").csv(outputDir + "/CustomerMerchantFeatures");
-        custMerchCatFeats.write().mode("overwrite").option("header", "true")
-        .csv(outputDir + "/CustomerMerchantCategoryFeatures");
-         */
+        // 3. Persist individual feature sets using a List instead of an Array
+        List<Dataset<Row>> sets = Arrays.asList(transFeats, merchFeats, custFeats, merchCatFeats, custMerchFeats, custMerchCatFeats);
+        String[] names = {"TransactionFeatures", "MerchantFeatures", "CustomerFeatures", "MerchantCategoryFeatures", "CustomerMerchantFeatures", "CustomerMerchantCategoryFeatures"};
+
+        for (int i = 0; i < names.length; i++) {
+            sets.get(i).coalesce(1).write().mode("overwrite").option("header", "true").csv(outputDir + "/" + names[i]);
+        }
+
 
         // 4. Combine for Training Records
-        /*Dataset<Row> trainingRecords = transFeats
-                .join(custFeats, transFeats.col("CUSTOMER_ID").equalTo(custFeats.col("CF_ID")), "left")
-                .join(merchFeats, transFeats.col("MERCHANT_ID").equalTo(merchFeats.col("MF_ID")), "left")
+        Dataset<Row> trainingRecords = transFeats
+                .join(custFeats, transFeats.col("CUSTOMER_ID").equalTo(custFeats.col("C_ID")), "left")
+                .join(merchFeats, transFeats.col("MERCHANT_ID").equalTo(merchFeats.col("M_ID")), "left")
                 .join(merchCatFeats, transFeats.col("CATEGORY").equalTo(merchCatFeats.col("MCF_CATEGORY")), "left")
                 .join(custMerchFeats,
                         transFeats.col("CUSTOMER_ID").equalTo(custMerchFeats.col("CM_CUSTOMER_ID"))
                                 .and(transFeats.col("MERCHANT_ID").equalTo(custMerchFeats.col("CM_MERCHANT_ID"))), "left")
                 .join(custMerchCatFeats,
                         transFeats.col("CUSTOMER_ID").equalTo(custMerchCatFeats.col("CMC_CUSTOMER_ID"))
-                                .and(transFeats.col("CATEGORY").equalTo(custMerchCatFeats.col("CMC_CATEGORY"))), "left");
+                                .and(transFeats.col("CATEGORY").equalTo(custMerchCatFeats.col("CMC_CATEGORY"))), "left")
+                .drop("C_ID", "M_ID", "MCF_CATEGORY", "CM_CUSTOMER_ID", "CM_MERCHANT_ID", "CMC_CUSTOMER_ID", "CMC_CATEGORY");
 
-        trainingRecords.write().mode("overwrite").option("header", "true")
-        .csv(outputDir + "/TrainingRecords");
-         */
+        trainingRecords.coalesce(1).write().mode("overwrite").option("header", "true").csv(outputDir + "/TrainingRecords");
 
         spark.stop();
     }
