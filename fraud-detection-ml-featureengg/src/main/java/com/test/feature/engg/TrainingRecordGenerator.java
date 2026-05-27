@@ -41,16 +41,15 @@ public class TrainingRecordGenerator {
         Dataset<Row> fraudTrans = spark.read().option("header", "true").option("inferSchema", "true")
                 .csv(inputDir + "/FraudTrans/*.csv");
 
-        // 2. Combine Datasets using TransactionFeatures as the Base
-        // We use left joins to ensure every transaction is preserved
+        // 2. Perform Joins with Updated Keys (C_ID and M_ID)
         Dataset<Row> combined = txFeats.as("tx")
-                // Join Customer Features
+                // Join Customer Features using C_ID
                 .join(custFeats.as("cust"), col("tx.CUSTOMER_ID").equalTo(col("cust.C_ID")), "left")
-                .drop(col("cust.C_ID"))
+                .drop(col("cust.C_ID")).drop(col("cust.ID"))
 
-                // Join Merchant Features (CATEGORY conflict now resolved by the drop above)
+                // Join Merchant Features using M_ID
                 .join(merchFeats.as("merch"), col("tx.MERCHANT_ID").equalTo(col("merch.M_ID")), "left")
-                .drop(col("merch.M_ID")).drop("merch.CATEGORY")
+                .drop(col("merch.M_ID")).drop(col("merch.ID"))
 
                 // Join Merchant Category Features
                 .join(merchCatFeats.as("mcf"), col("tx.CATEGORY").equalTo(col("mcf.MCF_CATEGORY")), "left")
@@ -70,28 +69,17 @@ public class TrainingRecordGenerator {
 
                 // Join Fraud Labels
                 .join(fraudTrans.as("f"), col("tx.ID").equalTo(col("f.TRANS_ID")), "left")
-                .drop(col("f.TRANS_ID"));
+                .drop(col("f.TRANS_ID")).drop(col("f.ID"));
 
-        // 3. Clean up join-key columns to avoid duplicates in the final CSV
-        /*Dataset<Row> trainingRecords = combined.drop(
-                "CF_ID", "MF_ID", "MCF_CATEGORY",
-                "CM_CUSTOMER_ID", "CM_MERCHANT_ID",
-                "CMC_CUSTOMER_ID", "CMC_CATEGORY", "TRANS_ID"
-        );*/
+        combined.printSchema();
 
-        Dataset<Row> trainingRecords = combined.drop("cust.ID", "f.ID");
-
-        System.out.println("TrainRecord structure::");
-        System.out.println(trainingRecords.describe().toString());
-
-        // 4. Persist Result
-        // Note: coalesce(1) is removed for memory safety. Spark will write multiple files.
-        trainingRecords.write()
+        // 3. Final Persistence
+        combined.write()
                 .mode("overwrite")
                 .option("header", "true")
                 .csv(outputDir);
 
-        System.out.println("Combined training records generated in: " + outputDir);
+        System.out.println("Training records generated successfully");
 
         spark.stop();
     }
