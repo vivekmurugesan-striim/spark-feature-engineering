@@ -23,7 +23,8 @@ public class SparkDriver {
                 .getOrCreate();
 
         // 1. Load Datasets
-        Dataset<Row> customers = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer*.csv");
+        Dataset<Row> customers =
+                spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer.*.csv");
         Dataset<Row> devices = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer_device*.csv");
         Dataset<Row> merchants = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/merchant*.csv");
         Dataset<Row> transactions = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/transaction*.csv");

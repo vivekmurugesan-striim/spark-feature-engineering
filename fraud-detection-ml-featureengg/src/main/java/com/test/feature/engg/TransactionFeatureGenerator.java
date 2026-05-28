@@ -29,7 +29,9 @@ public class TransactionFeatureGenerator {
 
         // 1. Load Datasets
         Dataset<Row> transactions = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/transaction*.csv");
-        Dataset<Row> customers = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer*.csv");
+        Dataset<Row> customers =
+                spark.read().option("header", "true").option("inferSchema",
+                        "true").csv(inputDir + "/customer.*.csv");
         Dataset<Row> merchants = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/merchant*.csv");
 
         // 2. Generate Features
@@ -76,6 +78,7 @@ public class TransactionFeatureGenerator {
         long txCount = tx.count();
         long joinedCount = joined.count();
 
+        System.out.println("Customer data::" + cust.count());
         System.out.println("TxCount::" + txCount);
         System.out.println("JoinedCount::" + joinedCount);
 
