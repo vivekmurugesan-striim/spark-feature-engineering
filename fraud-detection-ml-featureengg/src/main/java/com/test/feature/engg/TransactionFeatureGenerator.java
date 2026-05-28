@@ -51,9 +51,11 @@ public class TransactionFeatureGenerator {
 
         Dataset<Row> joined = tx.join(cust,
                         tx.col("CUSTOMER_ID").equalTo(cust.col("ID")),
-                        "left")
-                .join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")),
-                        "left");
+                        "inner");
+        System.out.println("JoinedCount:: after 1st join " + joined.count());
+        joined = joined
+                    .join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")),
+                        "inner");
 
         long txCount = tx.count();
         long joinedCount = joined.count();
@@ -63,7 +65,7 @@ public class TransactionFeatureGenerator {
 
         if(txCount != joinedCount){
             System.err.println("Transaction Count and joined count are not " +
-                    "matchin hence exiting::" + txCount + " != " + joinedCount);
+                    "matching hence exiting::" + txCount + " != " + joinedCount);
             spark.close();
             System.exit(1);
         }
