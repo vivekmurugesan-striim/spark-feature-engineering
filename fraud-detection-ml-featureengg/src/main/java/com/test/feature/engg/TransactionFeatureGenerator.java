@@ -51,7 +51,8 @@ public class TransactionFeatureGenerator {
                                                            SparkSession spark) {
 
         cust = cust.select(cust.col("ID"), cust.col("CITY"));
-        merch = merch.select(merch.col("ID"), merch.col("CITY"));
+        merch = merch.select(merch.col("ID"), merch.col("CITY"), merch.col(
+                "CATEGORY"));
 
         Dataset<Row> joined = tx.join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")),
                 "inner");
