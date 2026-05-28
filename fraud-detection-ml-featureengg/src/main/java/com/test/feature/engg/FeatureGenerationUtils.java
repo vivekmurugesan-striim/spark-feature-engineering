@@ -17,7 +17,7 @@ public class FeatureGenerationUtils {
     //FraudTransactionHeader: ID,IS_FRAUD,TRANS_ID
 
     // Helper: Enrich Transactions with time components and fraud status
-    private static Dataset<Row> enrichTx(Dataset<Row> tx, Dataset<Row> fraud) {
+    public static Dataset<Row> enrichTx(Dataset<Row> tx, Dataset<Row> fraud) {
         // Rename fraud.ID to avoid ambiguity with tx.ID
         Dataset<Row> renamedFraud = fraud.withColumnRenamed("ID", "FRAUD_PK_ID");
 
@@ -38,7 +38,8 @@ public class FeatureGenerationUtils {
      * Corrected Helper: Compute Mode (Top/Least Freq) for categorical dimensions.
      * Now preserves the idCol to allow for subsequent joins.
      */
-    private static Dataset<Row> getMode(Dataset<Row> t, String idCol, String dimCol, String prefix) {
+    public static Dataset<Row> getMode(Dataset<Row> t, String idCol, String dimCol
+            , String prefix) {
         Dataset<Row> counts = t.groupBy(idCol, dimCol).agg(count("*").as("c"));
 
         Dataset<Row> top = counts.withColumn("rn", row_number().over(Window.partitionBy(idCol).orderBy(desc("c"))))
