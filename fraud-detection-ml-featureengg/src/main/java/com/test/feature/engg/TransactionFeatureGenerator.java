@@ -52,7 +52,16 @@ public class TransactionFeatureGenerator {
         Dataset<Row> joined = tx.join(cust,
                         tx.col("CUSTOMER_ID").equalTo(cust.col("ID")),
                         "inner");
-        System.out.println("JoinedCount:: after 1st join " + joined.count());
+
+        System.out.println("After 1st join::");
+        System.out.println("JoinedCount:: " + joined.count());
+        joined.printSchema();
+        System.out.println(".. 50 records..");
+        System.out.println(joined.head(50).toString());
+
+        System.out.println("Distinct count::" + joined.distinct().count());
+
+
         joined = joined
                     .join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")),
                         "inner");
@@ -62,6 +71,12 @@ public class TransactionFeatureGenerator {
 
         System.out.println("TxCount::" + txCount);
         System.out.println("JoinedCount::" + joinedCount);
+
+        System.out.println("After 2nd join::");
+        System.out.println("JoinedCount:: " + joinedCount);
+        joined.printSchema();
+        System.out.println(".. 50 records..");
+        System.out.println(joined.head(50).toString());
 
         if(txCount != joinedCount){
             System.err.println("Transaction Count and joined count are not " +
