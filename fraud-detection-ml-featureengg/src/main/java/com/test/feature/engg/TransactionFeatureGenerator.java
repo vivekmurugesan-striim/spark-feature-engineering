@@ -4,6 +4,8 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
+import java.util.List;
+
 import static org.apache.spark.sql.functions.*;
 import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.date_format;
@@ -49,22 +51,27 @@ public class TransactionFeatureGenerator {
         cust = cust.select(cust.col("ID"), cust.col("CITY"));
         merch = merch.select(merch.col("ID"), merch.col("CITY"));
 
-        Dataset<Row> joined = tx.join(cust,
-                        tx.col("CUSTOMER_ID").equalTo(cust.col("ID")),
-                        "inner");
+        Dataset<Row> joined = tx.join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")),
+                "inner");
 
         System.out.println("After 1st join::");
         System.out.println("JoinedCount:: " + joined.count());
         joined.printSchema();
         System.out.println(".. 50 records..");
+
+        List<Row> list = joined.limit(50).takeAsList(50);
+        for(Row r : list){
+            System.out.println(r.toString());
+        }
+
         System.out.println(joined.head(50).toString());
 
         System.out.println("Distinct count::" + joined.distinct().count());
 
 
         joined = joined
-                    .join(merch, tx.col("MERCHANT_ID").equalTo(merch.col("ID")),
-                        "inner");
+                    .join(cust, tx.col("CUSTOMER_ID").equalTo(cust.col("ID")),
+                            "inner");;
 
         long txCount = tx.count();
         long joinedCount = joined.count();
@@ -76,7 +83,11 @@ public class TransactionFeatureGenerator {
         System.out.println("JoinedCount:: " + joinedCount);
         joined.printSchema();
         System.out.println(".. 50 records..");
-        System.out.println(joined.head(50).toString());
+
+        list = joined.limit(50).takeAsList(50);
+        for(Row r : list){
+            System.out.println(r.toString());
+        }
 
         if(txCount != joinedCount){
             System.err.println("Transaction Count and joined count are not " +
