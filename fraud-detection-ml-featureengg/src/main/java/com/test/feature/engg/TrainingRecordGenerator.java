@@ -41,8 +41,43 @@ public class TrainingRecordGenerator {
         Dataset<Row> fraudTrans = spark.read().option("header", "true").option("inferSchema", "true")
                 .csv(inputDir + "/FraudTrans/*.csv");
 
+        System.out.println("Printing the count of records..");
+
+        System.out.println("TxFeatures:: " + txFeats.count());
+        System.out.println("CustomerFeatures:: " + custFeats.count());
+        System.out.println("MerchantFeatures:: " + merchFeats.count());
+        System.out.println("CustomerMerchantFeatrues:: " + custMerchCatFeats.count());
+        System.out.println("CustomerMerchantCategoryFeatures:: " + custMerchCatFeats.count());
+        System.out.println("MerchantCategoryFeatures:: " + merchCatFeats.count());
+        System.out.println("FraudTrans features:: " + fraudTrans.count());
+
+
+        System.out.println("Schema:: ");
+
+        System.out.println("TxFeatures:: Schema ");
+        txFeats.printSchema();
+
+        System.out.println("CustomerFeatures:: Schema ");
+        custFeats.printSchema();
+
+        System.out.println("MerchantFeatures:: Schema");
+        merchFeats.printSchema();
+
+        System.out.println("CustomerMerchantFeatrues:: Schema");
+        custMerchCatFeats.printSchema();
+
+
+        System.out.println("CustomerMerchantCategoryFeatures:: Schema");
+        custMerchCatFeats.printSchema();
+
+        System.out.println("MerchantCategoryFeatures:: Schema");
+        merchCatFeats.printSchema();
+
+        System.out.println("FraudTrans features:: Schema");
+        fraudTrans.printSchema();
+
         // 2. Perform Joins with Updated Keys (C_ID and M_ID)
-        Dataset<Row> combined = txFeats.as("tx")
+        /*Dataset<Row> combined = txFeats.as("tx")
                 // Join Customer Features using C_ID
                 .join(custFeats.as("cust"), col("tx.CUSTOMER_ID").equalTo(col("cust.C_ID")), "left")
                 .drop(col("cust.C_ID")).drop(col("cust.ID"))
@@ -81,7 +116,7 @@ public class TrainingRecordGenerator {
                 .option("header", "true")
                 .csv(outputDir);
 
-        System.out.println("Training records generated successfully");
+        System.out.println("Training records generated successfully");*/
 
         spark.stop();
     }
