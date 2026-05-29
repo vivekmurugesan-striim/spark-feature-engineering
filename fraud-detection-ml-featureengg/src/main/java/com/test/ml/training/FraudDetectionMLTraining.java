@@ -53,9 +53,23 @@ public class FraudDetectionMLTraining {
                 .schema(schema)
                 .csv(inputDir + "/*.csv");
 
+        System.out.println("File reading completed successfully..");
+        System.out.println("Count of records::" + rawData.count());
+        rawData.printSchema();
+
         // 2. EDA: Show Summary Statistics
         System.out.println("Summary Statistics for numerical features:");
-        rawData.select("VALUEUSD", "CustomerTotalAmount", "MerchantTotalAmount", "IS_FRAUD").summary().show();
+        Dataset<Row> subsetData = rawData.select("VALUEUSD",
+                "CustomerTotalAmount", "MerchantTotalAmount", "IS_FRAUD");
+        subsetData.printSchema();
+        List<Row> rows = subsetData.limit(50).takeAsList(50);
+        System.out.println("Top 50 rows from the subset.. for summary stats..");
+        for (Row row : rows){
+            System.out.println("Record::" + row);
+        }
+        subsetData.summary().show();
+
+        System.out.println("Cleaning data..");
 
         // 3. Drop Non-Predictive/Sensitive Columns and Cast Numeric Strings
         Dataset<Row> cleanedData = rawData.select(
@@ -84,16 +98,23 @@ public class FraudDetectionMLTraining {
         // 4. Handle Class Imbalance (Weighting)
         // Fraud is rare; calculate weights to give more importance to the fraud cases (label=1)
         long totalCount = cleanedData.count();
+        System.out.println("Total count from cleand data::" + totalCount);
         long fraudCount = cleanedData.filter("label = 1").count();
+        System.out.println("Fraud count from cleand data::" + fraudCount);
         double weightForFraud = (double) totalCount / (2.0 * fraudCount);
         double weightForNonFraud = (double) totalCount / (2.0 * (totalCount - fraudCount));
+
+        System.out.println("Fraud and non-fraud weights::" + weightForFraud + "::" + weightForNonFraud);
 
         Dataset<Row> weightedData = cleanedData.withColumn("classWeight",
                 when(col("label").equalTo(1), weightForFraud).otherwise(weightForNonFraud));
 
         // CRITICAL STORAGE OPTIMIZATION: Persist transformed data to stop recalculations across iterations
         weightedData.persist(StorageLevel.MEMORY_AND_DISK_SER());
-        weightedData.count(); // Action triggers asynchronous caching ahead of split
+        long weightedDataCount =
+                weightedData.count(); // Action triggers asynchronous caching
+        // ahead of split
+        System.out.println("Weighted data count:: " + weightedDataCount);
 
         // 5. Categorical Transformations (StringIndexer)
         String[] categoricalCols = {"CATEGORY", "TopSpentCategory"};
@@ -106,6 +127,12 @@ public class FraudDetectionMLTraining {
                     .setHandleInvalid("keep"); // Handle new categories in test data
             stages.add(indexer);
         }
+
+        System.out.println("Pipeline stages created..:: ");
+        for (PipelineStage stage : stages)
+            System.out.println("Stage.. " + stage);
+
+        System.out.println("Assembling features");
 
         // 6. Assemble Features
         String[] numericCols = {
@@ -135,6 +162,10 @@ public class FraudDetectionMLTraining {
         Dataset<Row> trainingSet = splits[0];
         Dataset<Row> testSet = splits[1];
 
+        System.out.println("Train test split done");
+        System.out.println("Train data count:: " + trainingSet.count());
+        System.out.println("Test data count:: " + testSet.count());
+
         // 8. RandomForest Model
         RandomForestClassifier rf = new RandomForestClassifier()
                 .setLabelCol("label")
@@ -146,10 +177,13 @@ public class FraudDetectionMLTraining {
                 .setSeed(42);
         stages.add(rf);
 
+        System.out.println("Starting model training..");
+
         // 9. Build and Fit Pipeline
         Pipeline pipeline = new Pipeline().setStages(stages.toArray(new PipelineStage[0]));
         PipelineModel model = pipeline.fit(trainingSet);
 
+        System.out.println("Model fit done.. eval started..");
         // 10. Evaluation
         Dataset<Row> predictions = model.transform(testSet);
         MulticlassClassificationEvaluator evaluator = new MulticlassClassificationEvaluator()
