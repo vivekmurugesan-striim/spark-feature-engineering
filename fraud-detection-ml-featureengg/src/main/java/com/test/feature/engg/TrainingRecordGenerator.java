@@ -77,7 +77,7 @@ public class TrainingRecordGenerator {
         fraudTrans.printSchema();
 
         // 2. Perform Joins with Updated Keys (C_ID and M_ID)
-        /*Dataset<Row> combined = txFeats.as("tx")
+       Dataset<Row> combined = txFeats.as("tx")
                 // Join Customer Features using C_ID
                 .join(custFeats.as("cust"), col("tx.CUSTOMER_ID").equalTo(col("cust.C_ID")), "left")
                 .drop(col("cust.C_ID")).drop(col("cust.ID"))
@@ -110,13 +110,16 @@ public class TrainingRecordGenerator {
 
         combined.printSchema();
 
+        System.out.println(" Total number of training records generated:: "
+                + combined.count());
+
         // 3. Final Persistence
         combined.write()
                 .mode("overwrite")
                 .option("header", "true")
                 .csv(outputDir);
 
-        System.out.println("Training records generated successfully");*/
+        System.out.println("Training records generated successfully");
 
         spark.stop();
     }
