@@ -10,6 +10,12 @@ import org.apache.spark.ml.feature.VectorAssembler;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.storage.StorageLevel;
+
 import static org.apache.spark.sql.functions.*;
 
 import java.io.IOException;
@@ -29,14 +35,22 @@ public class FraudDetectionMLTraining {
 
         SparkSession spark = SparkSession.builder()
                 .appName("Large Scale Fraud Prediction Training")
-                .config("spark.sql.broadcastTimeout", "1200") // Handling large data joins/broadcasts
+                .config("spark.sql.broadcastTimeout", "1800") // Handling large
+                // data joins/broadcasts
                 .getOrCreate();
 
+        // Set checkpoint directory to truncate RDD lineage graphs for massive data splits
+        spark.sparkContext().setCheckpointDir(outputDir + "/checkpoints");
+
+        StructType schema = buildSchema();
+
         // 1. Load Data from TrainingData directory
-        // Using inferSchema=true for automatic type detection; for 175GB, manual schema is safer but inferSchema works if data is consistent
+        // Using inferSchema=true for automatic type detection; for 43GB, manual
+        // schema is safer but inferSchema works if data is consistent
+        // Load data safely with explicit schema
         Dataset<Row> rawData = spark.read()
                 .option("header", "true")
-                .option("inferSchema", "true")
+                .schema(schema)
                 .csv(inputDir + "/*.csv");
 
         // 2. EDA: Show Summary Statistics
@@ -76,6 +90,10 @@ public class FraudDetectionMLTraining {
 
         Dataset<Row> weightedData = cleanedData.withColumn("classWeight",
                 when(col("label").equalTo(1), weightForFraud).otherwise(weightForNonFraud));
+
+        // CRITICAL STORAGE OPTIMIZATION: Persist transformed data to stop recalculations across iterations
+        weightedData.persist(StorageLevel.MEMORY_AND_DISK_SER());
+        weightedData.count(); // Action triggers asynchronous caching ahead of split
 
         // 5. Categorical Transformations (StringIndexer)
         String[] categoricalCols = {"CATEGORY", "TopSpentCategory"};
@@ -123,7 +141,8 @@ public class FraudDetectionMLTraining {
                 .setFeaturesCol("features")
                 .setWeightCol("classWeight")
                 .setNumTrees(100)
-                .setMaxDepth(10)
+                .setMaxDepth(7)
+                .setMaxBins(32)
                 .setSeed(42);
         stages.add(rf);
 
@@ -157,4 +176,103 @@ public class FraudDetectionMLTraining {
 
         spark.stop();
     }
+
+    private static StructType buildSchema(){
+
+                // 1. Explicit Schema Definition (CRITICAL: Removes double-pass inferSchema overhead)
+                StructType schema = new StructType(new StructField[]{
+                        new StructField("IS_FRAUD", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("VALUEUSD", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("TransactionHour", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("TransactionDayOfWeek", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("TransactionIsWeekend", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("TransactionMonth", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("InCityTransaction", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("ACCOUNT_AGE_DAYS", DataTypes.IntegerType, true
+                                , Metadata.empty()),
+                        new StructField("AGE", DataTypes.IntegerType, true,
+                                Metadata.empty()),
+                        new StructField("CREDIT_SCORE", DataTypes.IntegerType, true,
+                                Metadata.empty()),
+                        new StructField("CustomerTransactionCount",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("CustomerTotalAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustomerAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustomerFraudCount", DataTypes.IntegerType,
+                                true, Metadata.empty()),
+                        new StructField("HighestTransactionValue", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("LowestTransactionValue", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustomerFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustomerDeviceCount", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("MerchantTransactionCount",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("MerchantTotalAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("MerchantAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("MerchantFraudCount", DataTypes.IntegerType,
+                                true, Metadata.empty()),
+                        new StructField("HighestTransactionValueForMerchant", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("LowestTransactionValueForMerchant", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("MerchantFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("DailyTransValueAvgForMerchant", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("WeeklyTransValueAvgForMerchant", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("MonthlyTransValueAvgForMerchant", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("TopFreqMerchantday", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("LeastFreqMerchantday", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("TopFreqMerchanthour", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("LeastFreqMerchanthour", DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("CategoryTransactionCount",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("CategoryTotalAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CategoryAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CategoryFraudCount", DataTypes.IntegerType,
+                                true, Metadata.empty()),
+                        new StructField("HighestTransactionValueForCategory", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("LowestTransactionValueForCategory", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CategoryFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustMerchTransactionCount",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("CustMerchTotalAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustMerchAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustMerchFraudCount", DataTypes.IntegerType,
+                                true, Metadata.empty()),
+                        new StructField("HighestTransactionValueForMerchantByCustomer", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustMerchFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("TimeSinceLastTx", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustMerchCatTransactionCount",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("CustMerchCatTotalAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustMerchCatAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CustMerchCatFraudCount", DataTypes.IntegerType
+                                , true, Metadata.empty()),
+                        new StructField("CustMerchCatFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                        new StructField("CATEGORY", DataTypes.StringType, true, Metadata.empty()),
+                        new StructField("TopSpentCategory",
+                                DataTypes.StringType, true, Metadata.empty()),
+                        new StructField("ID",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("STATUS",
+                                DataTypes.StringType, true, Metadata.empty()),
+                        new StructField("TRANS_TIMESTAMP",
+                                DataTypes.TimestampType, true, Metadata.empty()),
+                        new StructField("CUSTOMER_ID",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("DEVICE_ID",
+                                DataTypes.IntegerType, true, Metadata.empty()),
+                        new StructField("CITY",
+                                DataTypes.StringType, true, Metadata.empty()),
+                        new StructField("FIRST_NAME",
+                                DataTypes.StringType, true, Metadata.empty()),
+                        new StructField("LAST_NAME",
+                                DataTypes.StringType, true, Metadata.empty()),
+                        new StructField("NAME",
+                                DataTypes.StringType, true, Metadata.empty()),
+                        new StructField("MERCHANT_ID",
+                                DataTypes.IntegerType, true, Metadata.empty())
+                });
+
+
+
+                return schema;
+
+            }
 }
