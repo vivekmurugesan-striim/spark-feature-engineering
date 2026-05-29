@@ -5,6 +5,7 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
 import static com.test.feature.engg.FeatureGenerationUtils.enrichTx;
+import static com.test.feature.engg.FeatureGenerationUtils.filterTxRecords;
 import static org.apache.spark.sql.functions.*;
 import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.sum;
@@ -28,15 +29,20 @@ public class CustomerMerchantCategoryFeatureGenerator {
 
             // 1. Load Datasets
             Dataset<Row> merchants = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/merchant*.csv");
-            Dataset<Row> transactions = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/transaction*.csv");
+            Dataset<Row> transactions = filterTxRecords(spark.read().option(
+                    "header", "true").option("inferSchema", "true").csv(inputDir + "/transaction*.csv"));
             Dataset<Row> fraud = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/fraud_transaction*.csv");
 
             // 2. Generate Features
-            Dataset<Row> merchantFeatures = generateCustomerMerchantCategoryFeatures(transactions,
+            Dataset<Row> custMerchCatFeatures = generateCustomerMerchantCategoryFeatures(transactions,
                     merchants,fraud);
 
+            System.out.println("Generated:: customer merchant category " +
+                    "features with " +
+                    "count::" + custMerchCatFeatures.count());
+
             // 3. Persist result
-            merchantFeatures.write().mode("overwrite").option("header", "true").csv(outputDir +
+            custMerchCatFeatures.write().mode("overwrite").option("header", "true").csv(outputDir +
                     "/" + "CustomerMerchantCategoryFeatures");
 
             spark.close();

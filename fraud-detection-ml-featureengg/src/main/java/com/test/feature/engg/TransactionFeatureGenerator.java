@@ -6,6 +6,7 @@ import org.apache.spark.sql.SparkSession;
 
 import java.util.List;
 
+import static com.test.feature.engg.FeatureGenerationUtils.filterTxRecords;
 import static org.apache.spark.sql.functions.*;
 import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.date_format;
@@ -28,7 +29,10 @@ public class TransactionFeatureGenerator {
                 .getOrCreate();
 
         // 1. Load Datasets
-        Dataset<Row> transactions = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/transaction*.csv");
+        Dataset<Row> transactions =
+                filterTxRecords(spark.read().option("header", "true").option(
+                        "inferSchema",
+                        "true").csv(inputDir + "/transaction*.csv"));
         Dataset<Row> customers =
                 spark.read().option("header", "true").option("inferSchema",
                         "true").csv(inputDir + "/customer.*.csv");
@@ -37,6 +41,8 @@ public class TransactionFeatureGenerator {
         // 2. Generate Features
         Dataset<Row> txFeatures = generateTransactionFeatures(transactions,
                 customers, merchants, spark);
+
+        System.out.println("Generated:: tx features with count::" + txFeatures.count());
 
         // 3. Persist result
         txFeatures.write().mode("overwrite").option("header", "true").csv(outputDir +

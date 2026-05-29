@@ -159,4 +159,8 @@ public class FeatureGenerationUtils {
                 .withColumn("InCityTransaction", when(cust.col("CITY").equalTo(merch.col("CITY")), 1).otherwise(0))
                 .select(tx.col("*"), merch.col("CATEGORY"), col("TransactionHour"), col("TransactionDayOfWeek"), col("TransactionIsWeekend"), col("TransactionMonth"), col("InCityTransaction"));
     }
+
+    public static Dataset<Row> filterTxRecords(Dataset<Row> transactions){
+        return transactions.filter(col("VALUEUSD").gt(0.0));
+    }
 }
