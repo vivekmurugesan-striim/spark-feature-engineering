@@ -39,7 +39,7 @@ public class CustomerMerchantFeatureGenerator {
 
         // 3. Persist result
         merchantFeatures.write().mode("overwrite").option("header", "true").csv(outputDir +
-                "/" + "MerchantFeatures");
+                "/" + "CustomerMerchantFeatures");
 
         spark.close();
     }
