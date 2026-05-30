@@ -55,7 +55,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         // 2. EDA: Show Summary Statistics
         System.out.println("Summary Statistics for numerical features:");
         Dataset<Row> subsetData = rawData.select("VALUEUSD",
-                "CustomerTotalAmount", "MerchantTotalAmount", "label");
+                "CustomerAvgAmount", "MerchantAvgAmount", "label");
         subsetData.printSchema();
         List<Row> rows = subsetData.limit(50).takeAsList(50);
         System.out.println("Top 50 rows from the subset.. for summary stats..");
