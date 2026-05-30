@@ -53,7 +53,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         rawData.printSchema();
 
         // 2. EDA: Show Summary Statistics
-        System.out.println("Summary Statistics for numerical features:");
+        /*System.out.println("Summary Statistics for numerical features:");
         Dataset<Row> subsetData = rawData.select("VALUEUSD",
                 "CustomerAvgAmount", "MerchantAvgAmount", "label");
         subsetData.printSchema();
@@ -62,7 +62,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         for (Row row : rows){
             System.out.println("Record::" + row);
         }
-        subsetData.summary().show();
+        subsetData.summary().show();*/
 
         System.out.println("Cleaning data..");
 
@@ -132,7 +132,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
                 .setLabelCol("label")
                 .setFeaturesCol("features")
                 .setWeightCol("classWeight") // Use the calculated weights for imbalance handling
-                .setMaxIter(10)
+                .setMaxIter(50)
                 .setRegParam(0.1) // Default L2 regularization strength
                 .setElasticNetParam(0.0); // 0.0 for L2 regularization
 
