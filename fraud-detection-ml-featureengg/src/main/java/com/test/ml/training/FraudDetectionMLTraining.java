@@ -58,7 +58,7 @@ public class FraudDetectionMLTraining {
         rawData.printSchema();
 
         // 2. EDA: Show Summary Statistics
-        System.out.println("Summary Statistics for numerical features:");
+        /*System.out.println("Summary Statistics for numerical features:");
         Dataset<Row> subsetData = rawData.select("VALUEUSD",
                 "CustomerTotalAmount", "MerchantTotalAmount", "label");
         subsetData.printSchema();
@@ -67,7 +67,7 @@ public class FraudDetectionMLTraining {
         for (Row row : rows){
             System.out.println("Record::" + row);
         }
-        subsetData.summary().show();
+        subsetData.summary().show();*/
 
         System.out.println("Cleaning data..");
 
