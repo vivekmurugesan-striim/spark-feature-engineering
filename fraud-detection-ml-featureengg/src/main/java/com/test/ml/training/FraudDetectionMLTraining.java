@@ -106,6 +106,8 @@ public class FraudDetectionMLTraining {
 
         System.out.println("Fraud and non-fraud weights::" + weightForFraud + "::" + weightForNonFraud);
 
+        System.out.println("Generating weighted data::");
+
         Dataset<Row> weightedData = cleanedData.withColumn("classWeight",
                 when(col("label").equalTo(1), weightForFraud).otherwise(weightForNonFraud));
 
@@ -208,7 +210,7 @@ public class FraudDetectionMLTraining {
            or a library like 'MLeap' to serialize the Spark model for cross-platform usage.
         */
 
-        spark.stop();
+        //spark.stop();
     }
 
     private static StructType buildSchema(){
