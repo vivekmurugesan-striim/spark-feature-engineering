@@ -12,7 +12,7 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructType;
 
-import static com.test.ml.training.DataPreprocessor.buildSchemaForData;
+import static com.test.ml.training.DataPreprocessor.buildSchemaForRawData;
 import static org.apache.spark.sql.functions.*;
 
 import java.io.IOException;
@@ -38,7 +38,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         // Set checkpoint directory to truncate RDD lineage graphs for massive data splits
         spark.sparkContext().setCheckpointDir(outputDir + "/checkpoints");
 
-        StructType schema = buildSchemaForData();
+        StructType schema = buildSchemaForRawData();
 
         // 1. Load Data from TrainingData directory
         // Load data safely with explicit schema
@@ -54,7 +54,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         // 2. EDA: Show Summary Statistics
         System.out.println("Summary Statistics for numerical features:");
         Dataset<Row> subsetData = rawData.select("VALUEUSD",
-                "CustomerTotalAmount", "MerchantTotalAmount", "IS_FRAUD");
+                "CustomerTotalAmount", "MerchantTotalAmount", "label");
         subsetData.printSchema();
         List<Row> rows = subsetData.limit(50).takeAsList(50);
         System.out.println("Top 50 rows from the subset.. for summary stats..");
@@ -66,28 +66,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         System.out.println("Cleaning data..");
 
         // 3. Drop Non-Predictive/Sensitive Columns and Cast Numeric Strings
-        Dataset<Row> cleanedData = rawData.select(
-                col("IS_FRAUD").cast("int").alias("label"),
-                col("VALUEUSD"), col("TransactionHour"), col("TransactionDayOfWeek"),
-                col("TransactionIsWeekend"), col("TransactionMonth"), col("InCityTransaction"),
-                col("ACCOUNT_AGE_DAYS").cast("double"), col("AGE").cast("double"), col("CREDIT_SCORE"),
-                col("CustomerTransactionCount"), col("CustomerTotalAmount"), col("CustomerAvgAmount"),
-                col("CustomerFraudCount"), col("HighestTransactionValue"), col("LowestTransactionValue"),
-                col("CustomerFraudRate"), col("CustomerDeviceCount"), col("MerchantTransactionCount"),
-                col("MerchantTotalAmount"), col("MerchantAvgAmount"), col("MerchantFraudCount"),
-                col("HighestTransactionValueForMerchant"), col("LowestTransactionValueForMerchant"),
-                col("MerchantFraudRate"), col("DailyTransValueAvgForMerchant"), col("WeeklyTransValueAvgForMerchant"),
-                col("MonthlyTransValueAvgForMerchant"), col("TopFreqMerchantday"), col("LeastFreqMerchantday"),
-                col("TopFreqMerchanthour"), col("LeastFreqMerchanthour"), col("CategoryTransactionCount"),
-                col("CategoryTotalAmount"), col("CategoryAvgAmount"), col("CategoryFraudCount"),
-                col("HighestTransactionValueForCategory"), col("LowestTransactionValueForCategory"),
-                col("CategoryFraudRate"), col("CustMerchTransactionCount"), col("CustMerchTotalAmount"),
-                col("CustMerchAvgAmount"), col("CustMerchFraudCount"), col("HighestTransactionValueForMerchantByCustomer"),
-                col("CustMerchFraudRate"), col("TimeSinceLastTx"), col("CustMerchCatTransactionCount"),
-                col("CustMerchCatTotalAmount"), col("CustMerchCatAvgAmount"), col("CustMerchCatFraudCount"),
-                col("CustMerchCatFraudRate"),
-                col("CATEGORY"), col("TopSpentCategory") // Categorical
-        ).na().fill(0);
+        Dataset<Row> cleanedData = rawData.na().fill(0);
 
         // 4. Handle Class Imbalance (Weighting)
         long totalCount = cleanedData.count();
@@ -112,7 +91,8 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         System.out.println("Weighted data count:: " + weightedDataCount);
 
         // 5. Categorical Transformations (StringIndexer)
-        String[] categoricalCols = {"CATEGORY", "TopSpentCategory"};
+        String[] categoricalCols =
+                DataPreprocessor.getCategoricalFeatureNames();
         List<PipelineStage> stages = new ArrayList<>();
 
         for (String colName : categoricalCols) {
@@ -130,22 +110,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         System.out.println("Assembling features");
 
         // 6. Assemble Features
-        String[] numericCols = {
-                "VALUEUSD", "TransactionHour", "TransactionDayOfWeek", "TransactionIsWeekend", "TransactionMonth",
-                "InCityTransaction", "ACCOUNT_AGE_DAYS", "AGE", "CREDIT_SCORE", "CustomerTransactionCount",
-                "CustomerTotalAmount", "CustomerAvgAmount", "CustomerFraudCount", "HighestTransactionValue",
-                "LowestTransactionValue", "CustomerFraudRate", "CustomerDeviceCount", "MerchantTransactionCount",
-                "MerchantTotalAmount", "MerchantAvgAmount", "MerchantFraudCount", "HighestTransactionValueForMerchant",
-                "LowestTransactionValueForMerchant", "MerchantFraudRate", "DailyTransValueAvgForMerchant",
-                "WeeklyTransValueAvgForMerchant", "MonthlyTransValueAvgForMerchant", "TopFreqMerchantday",
-                "LeastFreqMerchantday", "TopFreqMerchanthour", "LeastFreqMerchanthour", "CategoryTransactionCount",
-                "CategoryTotalAmount", "CategoryAvgAmount", "CategoryFraudCount", "HighestTransactionValueForCategory",
-                "LowestTransactionValueForCategory", "CategoryFraudRate", "CustMerchTransactionCount",
-                "CustMerchTotalAmount", "CustMerchAvgAmount", "CustMerchFraudCount", "HighestTransactionValueForMerchantByCustomer",
-                "CustMerchFraudRate", "TimeSinceLastTx", "CustMerchCatTransactionCount", "CustMerchCatTotalAmount",
-                "CustMerchCatAvgAmount", "CustMerchCatFraudCount", "CustMerchCatFraudRate",
-                "CATEGORYIndex", "TopSpentCategoryIndex"
-        };
+        String[] numericCols = DataPreprocessor.getNumericalFeatureNames();
 
         VectorAssembler assembler = new VectorAssembler()
                 .setInputCols(numericCols)

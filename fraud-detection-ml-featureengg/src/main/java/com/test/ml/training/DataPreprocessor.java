@@ -64,7 +64,7 @@ public class DataPreprocessor {
 
     // In total 23 numerical features + 1 label column to be used
     public static final Column[] numericalFeatures = {
-            col("IS_FRAUD").cast("int").alias("label"),
+            //col("IS_FRAUD").cast("int").alias("label"),
             col("VALUEUSD"),
             col("TransactionHour"),
             col("TransactionDayOfWeek"),
@@ -90,9 +90,25 @@ public class DataPreprocessor {
             col("CustMerchCatFraudRate")
     };
 
+    public static String[] getNumericalFeatureNames(){
+        String[] stringArray = Arrays.stream(numericalFeatures)
+                .map(Column::toString)
+                .toArray(String[]::new);
+
+        return stringArray;
+    }
+
     // Two categorical features to be used
     public static Column[] categoricalFeatures = { col("CATEGORY"), col(
             "TopSpentCategory") };
+
+    public static String[] getCategoricalFeatureNames(){
+        String[] stringArray = Arrays.stream(categoricalFeatures)
+                .map(Column::toString)
+                .toArray(String[]::new);
+
+        return stringArray;
+    }
 
     public static void main(String[] args){
 
@@ -113,7 +129,7 @@ public class DataPreprocessor {
         // Set checkpoint directory to truncate RDD lineage graphs for massive data splits
         spark.sparkContext().setCheckpointDir(outputDir + "/checkpoints");
 
-        StructType schema = buildSchemaForData();
+        StructType schema = buildSchemaForRawData();
 
         // 1. Load Data from TrainingData directory
         // Using inferSchema=true for automatic type detection; for 43GB, manual
@@ -166,7 +182,7 @@ public class DataPreprocessor {
 
 
     // The buildSchema method is necessary for explicit schema loading
-    public static StructType buildSchemaForData(){
+    public static StructType buildSchemaForRawData(){
 
         // 1. Explicit Schema Definition (CRITICAL: Removes double-pass inferSchema overhead)
         StructType schema = new StructType(new StructField[]{
@@ -233,6 +249,42 @@ public class DataPreprocessor {
                 new StructField("CustMerchCatFraudCount", DataTypes.IntegerType, true, Metadata.empty()),
                 new StructField("CustMerchCatFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
                 new StructField("IS_FRAUD", DataTypes.IntegerType, true, Metadata.empty())
+        });
+        return schema;
+
+    }
+
+    // The buildSchema method is necessary for explicit schema loading
+    public static StructType buildSelectedFeaturesSchema(){
+
+        // 1. Explicit Schema Definition (CRITICAL: Removes double-pass inferSchema overhead)
+        StructType schema = new StructType(new StructField[]{
+                new StructField("label", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("VALUEUSD", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("TransactionHour", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("TransactionDayOfWeek", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("TransactionIsWeekend", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("TransactionMonth", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("InCityTransaction", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("ACCOUNT_AGE_DAYS", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("CustomerAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("HighestTransactionValue", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CustomerFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CustomerDeviceCount", DataTypes.IntegerType, true, Metadata.empty()),
+                new StructField("MerchantAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("HighestTransactionValueForMerchant", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("MerchantFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CategoryAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("HighestTransactionValueForCategory", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CategoryFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CustMerchAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("HighestTransactionValueForMerchantByCustomer", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CustMerchFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("TimeSinceLastTx", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CustMerchCatAvgAmount", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CustMerchCatFraudRate", DataTypes.DoubleType, true, Metadata.empty()),
+                new StructField("CATEGORY", DataTypes.StringType, true, Metadata.empty()),
+                new StructField("TopSpentCategory", DataTypes.StringType, true, Metadata.empty()),
         });
         return schema;
 
