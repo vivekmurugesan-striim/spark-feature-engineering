@@ -13,6 +13,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructType;
 
 import static com.test.ml.training.DataPreprocessor.buildSchemaForRawData;
+import static com.test.ml.training.DataPreprocessor.buildSelectedFeaturesSchema;
 import static org.apache.spark.sql.functions.*;
 
 import java.io.IOException;
@@ -38,7 +39,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
         // Set checkpoint directory to truncate RDD lineage graphs for massive data splits
         spark.sparkContext().setCheckpointDir(outputDir + "/checkpoints");
 
-        StructType schema = buildSchemaForRawData();
+        StructType schema = buildSelectedFeaturesSchema();
 
         // 1. Load Data from TrainingData directory
         // Load data safely with explicit schema
@@ -131,7 +132,7 @@ public class FraudDetectionMLLogisticRegressionClassifier {
                 .setLabelCol("label")
                 .setFeaturesCol("features")
                 .setWeightCol("classWeight") // Use the calculated weights for imbalance handling
-                .setMaxIter(20)
+                .setMaxIter(10)
                 .setRegParam(0.1) // Default L2 regularization strength
                 .setElasticNetParam(0.0); // 0.0 for L2 regularization
 
