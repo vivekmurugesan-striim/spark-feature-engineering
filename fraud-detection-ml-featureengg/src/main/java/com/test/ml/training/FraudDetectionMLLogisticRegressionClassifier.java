@@ -3,7 +3,7 @@ package com.test.ml.training;
 import org.apache.spark.ml.Pipeline;
 import org.apache.spark.ml.PipelineModel;
 import org.apache.spark.ml.PipelineStage;
-import org.apache.spark.ml.classification.RandomForestClassifier;
+import org.apache.spark.ml.classification.LogisticRegression;
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator;
 import org.apache.spark.ml.feature.StringIndexer;
 import org.apache.spark.ml.feature.VectorAssembler;
@@ -11,7 +11,6 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.storage.StorageLevel;
 
 import static com.test.ml.training.DataPreprocessor.buildSchemaForData;
 import static org.apache.spark.sql.functions.*;
@@ -20,7 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FraudDetectionMLTraining {
+public class FraudDetectionMLLogisticRegressionClassifier {
     public static void main(String[] args) {
 
         if (args.length < 2) {
@@ -32,9 +31,8 @@ public class FraudDetectionMLTraining {
         String outputDir = args[1];
 
         SparkSession spark = SparkSession.builder()
-                .appName("Large Scale Fraud Prediction Training")
-                .config("spark.sql.broadcastTimeout", "1800") // Handling large
-                // data joins/broadcasts
+                .appName("Large Scale Fraud Prediction Logistic Regression Training")
+                .config("spark.sql.broadcastTimeout", "1800")
                 .getOrCreate();
 
         // Set checkpoint directory to truncate RDD lineage graphs for massive data splits
@@ -43,8 +41,6 @@ public class FraudDetectionMLTraining {
         StructType schema = buildSchemaForData();
 
         // 1. Load Data from TrainingData directory
-        // Using inferSchema=true for automatic type detection; for 43GB, manual
-        // schema is safer but inferSchema works if data is consistent
         // Load data safely with explicit schema
         Dataset<Row> rawData = spark.read()
                 .option("header", "true")
@@ -94,7 +90,6 @@ public class FraudDetectionMLTraining {
         ).na().fill(0);
 
         // 4. Handle Class Imbalance (Weighting)
-        // Fraud is rare; calculate weights to give more importance to the fraud cases (label=1)
         long totalCount = cleanedData.count();
         System.out.println("Total count from cleand data::" + totalCount);
         long fraudCount = cleanedData.filter("label = 1").count();
@@ -110,10 +105,10 @@ public class FraudDetectionMLTraining {
                 when(col("label").equalTo(1), weightForFraud).otherwise(weightForNonFraud));
 
         // CRITICAL STORAGE OPTIMIZATION: Persist transformed data to stop recalculations across iterations
-        weightedData.persist(StorageLevel.MEMORY_AND_DISK_SER());
+        // Important for large datasets (40GB) to prevent re-reading/re-processing on every pipeline stage
+        //weightedData.persist(StorageLevel.MEMORY_AND_DISK_SER());
         long weightedDataCount =
                 weightedData.count(); // Action triggers asynchronous caching
-        // ahead of split
         System.out.println("Weighted data count:: " + weightedDataCount);
 
         // 5. Categorical Transformations (StringIndexer)
@@ -124,7 +119,7 @@ public class FraudDetectionMLTraining {
             StringIndexer indexer = new StringIndexer()
                     .setInputCol(colName)
                     .setOutputCol(colName + "Index")
-                    .setHandleInvalid("keep"); // Handle new categories in test data
+                    .setHandleInvalid("keep");
             stages.add(indexer);
         }
 
@@ -166,16 +161,16 @@ public class FraudDetectionMLTraining {
         System.out.println("Train data count:: " + trainingSet.count());
         System.out.println("Test data count:: " + testSet.count());
 
-        // 8. RandomForest Model
-        RandomForestClassifier rf = new RandomForestClassifier()
+        // 8. LogisticRegression Model (REPLACED RandomForestClassifier)
+        LogisticRegression lr = new LogisticRegression()
                 .setLabelCol("label")
                 .setFeaturesCol("features")
-                .setWeightCol("classWeight")
-                .setNumTrees(100)
-                .setMaxDepth(7)
-                .setMaxBins(32)
-                .setSeed(42);
-        stages.add(rf);
+                .setWeightCol("classWeight") // Use the calculated weights for imbalance handling
+                .setMaxIter(20)
+                .setRegParam(0.1) // Default L2 regularization strength
+                .setElasticNetParam(0.0); // 0.0 for L2 regularization
+
+        stages.add(lr);
 
         System.out.println("Starting model training..");
 
@@ -184,6 +179,7 @@ public class FraudDetectionMLTraining {
         PipelineModel model = pipeline.fit(trainingSet);
 
         System.out.println("Model fit done.. eval started..");
+
         // 10. Evaluation
         Dataset<Row> predictions = model.transform(testSet);
         MulticlassClassificationEvaluator evaluator = new MulticlassClassificationEvaluator()
@@ -197,16 +193,17 @@ public class FraudDetectionMLTraining {
         // 11. Export Model
         try {
             model.write().overwrite().save(outputDir +
-                    "/FraudRandomForestModel");
+                    "/FraudLogisticRegressionModel"); // Updated model path
         }catch(IOException e){
             System.out.println("Not able to persist the model");
             e.printStackTrace();
         }
-        /*
-           Note on ONNX: Spark Java does not support native ONNX export.
-           To export to ONNX for production inference, use the 'onnxmltools' Python library
-           or a library like 'MLeap' to serialize the Spark model for cross-platform usage.
-        */
+
+       /*
+          Note on ONNX: Spark Java does not support native ONNX export.
+          To export to ONNX for production inference, use the 'onnxmltools' Python library
+          or a library like 'MLeap' to serialize the Spark model for cross-platform usage.
+       */
 
         //spark.stop();
     }
