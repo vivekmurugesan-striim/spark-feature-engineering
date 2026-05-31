@@ -138,8 +138,8 @@ public class FraudDetectionMLTraining {
                 .setLabelCol("label")
                 .setFeaturesCol("features")
                 .setWeightCol("classWeight")
-                .setNumTrees(50)
-                .setMaxDepth(7)
+                .setNumTrees(100)
+                .setMaxDepth(10)
                 .setMaxBins(32)
                 .setSeed(42);
         stages.add(rf);
