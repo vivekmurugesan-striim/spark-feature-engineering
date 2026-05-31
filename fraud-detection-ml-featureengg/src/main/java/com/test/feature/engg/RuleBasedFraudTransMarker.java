@@ -30,9 +30,12 @@ public class RuleBasedFraudTransMarker {
 
         // 1. Load Datasets
         Dataset<Row> customers =
-                spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer.*.csv");
-        Dataset<Row> devices = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/customer_device*.csv");
-        Dataset<Row> merchants = spark.read().option("header", "true").option("inferSchema", "true").csv(inputDir + "/merchant*.csv");
+                spark.read().option("header", "true")
+                        .option("inferSchema",
+            "true").csv(inputDir + "/customer.*.csv");
+        Dataset<Row> merchants =
+                spark.read().option("header", "true")
+                .option("inferSchema", "true").csv(inputDir + "/merchant*.csv");
         Dataset<Row> transactions =
                 filterTxRecords(spark.read().option("header", "true").option(
                         "inferSchema", "true").csv(inputDir + "/transaction*" +
@@ -118,6 +121,16 @@ public class RuleBasedFraudTransMarker {
                         col("TX.ID").alias("TRANS_ID"),
                         col("IS_FRAUD")
                 );
+
+        long nonFraudCount =
+                fraudFlagsDataset.filter(col("IS_FRAUD").equalTo(0)).count();
+
+        long fraudCount =
+                fraudFlagsDataset.filter(col("IS_FRAUD").equalTo(1)).count();
+
+        System.out.println("Non_fraud Count : " + nonFraudCount);
+        System.out.println("Fraud count::" + fraudCount);
+        System.out.println("Total count::" + fraudFlagsDataset.count());
 
         return fraudFlagsDataset;
 
