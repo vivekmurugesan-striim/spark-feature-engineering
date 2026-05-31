@@ -11,9 +11,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.storage.StorageLevel;
 
-import static com.test.ml.training.DataPreprocessor.buildSchemaForRawData;
 import static com.test.ml.training.DataPreprocessor.buildSelectedFeaturesSchema;
 import static org.apache.spark.sql.functions.*;
 
@@ -21,7 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FraudDetectionMLTraining {
+public class FraudDetectionMLRandomForestClassifier {
     public static void main(String[] args) {
 
         if (args.length < 2) {

@@ -231,13 +231,15 @@ public class RuleBasedFraudTransMarker {
                         "inner");
 
         Dataset<Row> result = joined
+                .withColumn("ts", to_timestamp(col("TRANS_TIMESTAMP")))
                 .withColumn("TransactionHour", hour(col("ts")))
                 .withColumn("TransactionDayOfWeek",
                         date_format(col("ts"), "u"))
                 .withColumn("TransactionIsWeekend",
                         when(date_format(col("ts"), "u").geq(6), 1).otherwise(0))
                 .withColumn("TransactionMonth", month(col("ts")))
-                .withColumn("InCityTransaction", when(cust.col("CITY").equalTo(merch.col("CITY")), 1).otherwise(0))
+                .withColumn("InCityTransaction", when(cust.col("CITY")
+                        .equalTo(merch.col("CITY")), 1).otherwise(0))
                 .select(tx.col("*"), merch.col("CATEGORY"), col("TransactionHour"),
                         col("TransactionDayOfWeek"), col("TransactionIsWeekend"), col("TransactionMonth"),
                         col("InCityTransaction"));
