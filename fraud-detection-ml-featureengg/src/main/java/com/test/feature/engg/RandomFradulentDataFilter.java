@@ -37,7 +37,7 @@ public class RandomFradulentDataFilter {
 
         System.out.println("Count of transaction records::"
                 + transactions.count());
-        System.out.println("Count of transaction records::"
+        System.out.println("Count of fraudtrans records::"
                 + fraudTrans.count());
 
         // Rename fraud.ID to avoid ambiguity with tx.ID
@@ -54,7 +54,7 @@ public class RandomFradulentDataFilter {
         System.out.println("Count of filtered fraudTrans records::"
                 + filteredFraudTrans.count());
 
-        transactions.write().mode("overwrite").option("header", "true").csv(outputDir +
+        filteredFraudTrans.write().mode("overwrite").option("header", "true").csv(outputDir +
                 "/" + "FraudTransactions");
 
     }
